@@ -181,7 +181,6 @@
         background-image: url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS2FKWGCyLI9Ao9AJppnVDSihZtrAvrzMqkaA&s');
         background-size: 150px;
         background-repeat: repeat;
-        background-opacity: 0.08;
       }
 
       .msgs_cont::-webkit-scrollbar {
@@ -375,8 +374,16 @@
         50% { opacity: 0; }
       }
 
-      /* Volume indicator - Improved */
-    
+      /* Volume indicator */
+      .volume-indicator {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 14px;
+        color: #11ba91;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
 
       .volume-indicator.active {
         opacity: 1;
@@ -406,36 +413,25 @@
         50% { transform: scale(1.1); }
       }
       
-      /* Auto-Listening notice */
-      .auto-listening-notice {
+      /* Speech feature notice */
+      .feature-notice {
         position: fixed;
-        top: 20px;
+        bottom: 70px;
         left: 50%;
         transform: translateX(-50%);
-        background-color: rgba(17, 186, 145, 0.9);
+        background-color: rgba(255, 137, 0, 0.9);
         color: white;
-        padding: 10px 20px;
+        padding: 8px 15px;
         border-radius: 50px;
-        font-size: 14px;
+        font-size: 12px;
         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
         z-index: 100;
-        display: flex;
+        display: none;
         align-items: center;
-        animation: noticeAppear 0.5s ease, noticeDisappear 0.5s ease 4.5s forwards;
       }
 
-      .auto-listening-notice i {
+      .feature-notice i {
         margin-right: 8px;
-      }
-
-      @keyframes noticeAppear {
-        from { opacity: 0; transform: translate(-50%, -20px); }
-        to { opacity: 1; transform: translate(-50%, 0); }
-      }
-
-      @keyframes noticeDisappear {
-        from { opacity: 1; transform: translate(-50%, 0); }
-        to { opacity: 0; transform: translate(-50%, -20px); }
       }
     </style>
   </head>
@@ -469,6 +465,11 @@
           <button class="uil-message">➤</button>
         </div>
       </div>
+
+      <div class="feature-notice">
+        <i class="fas fa-info-circle"></i>
+        <span id="feature-notice-text">Speech features might not work in all environments</span>
+      </div>
     </main>
 
     <script>
@@ -482,247 +483,319 @@
         let listeningIndicator = document.querySelector(".listening-indicator");
         let volumeIndicator = document.querySelector(".volume-indicator");
         let avatarContainer = document.querySelector(".avatar-container");
+        let featureNotice = document.querySelector(".feature-notice");
         
-        // Auto-listening mode
-        let autoListeningMode = true;
+        // Feature detection flags
+        let speechRecognitionSupported = false;
+        let speechSynthesisSupported = false;
+        
+        // Auto-listening mode - start with it off
+        let autoListeningMode = false;
         let listeningTimeout = null;
         
         // Default avatar and talking avatar URLs
         const defaultAvatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhhH8Fy8MTPge0EQCU1LqX1X9dFM9-2vrs6v0EBVHKlyyOpTmY3BezscBcGbAAcTxamK4fBp3uTLQzk10K4u5eeA5ZIgnoHviNkfRHX64jI2-HHlsl9d4JG_rr8ksQdaDZVc0kXZYPdvqpsIGCN_v-AelJcZIBlmKSxZLS_-MTghsavn2yi5Lx4IZD2tQA/s800/WhatsAppVideo2025-01-10at9.29.03PM-ezgif.com-video-to-gif-converter.gif";
         const talkingAvatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhlLmZw1azadUdBSMQjrIZPx5uONLyewoDxZh5EYn6aL0qmnIzzIJpuazFzbjDysUYwxURX8mp_7cGFh4g9q_3IAT16v0eYlW9YhTpXULByDkLXAYLB-hfMXghliccmRmFG02o4kTt3eZEpo8CHUrPr0p1IIYCrhe7QEdOKaqEzWk7WtQMgaAHt0MYlF0A/s2566/aivideo.gif";
         
-        // Speech synthesis setup
-        const synth = window.speechSynthesis;
+        // Speech feature setup and detection
+        const setupSpeechFeatures = function() {
+            // Check for speech synthesis support
+            if (typeof window.speechSynthesis !== 'undefined') {
+                speechSynthesisSupported = true;
+            } else {
+                console.log("Speech synthesis not supported");
+            }
+            
+            // Check for speech recognition support
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                speechRecognitionSupported = true;
+                setupSpeechRecognition(SpeechRecognition);
+            } else {
+                console.log("Speech recognition not supported");
+                micButton.style.display = "none";
+            }
+            
+            // Show notice if either feature is not supported
+            if (!speechSynthesisSupported || !speechRecognitionSupported) {
+                featureNotice.textContent = "Some speech features are not supported in your browser";
+                featureNotice.style.display = "flex";
+                
+                // Hide after 5 seconds
+                setTimeout(() => {
+                    featureNotice.style.display = "none";
+                }, 5000);
+            }
+        };
+        
+        // Setup speech synthesis
+        let synth = null;
         let voices = [];
         
-        // Get available voices
-        function populateVoices() {
-          voices = synth.getVoices();
-        }
-        
-        if (speechSynthesis.onvoiceschanged !== undefined) {
-          speechSynthesis.onvoiceschanged = populateVoices;
-        }
-        
-        populateVoices();
-        
-        // Speech recognition setup
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = SpeechRecognition ? new SpeechRecognition() : null;
-        
-        if (recognition) {
-          recognition.continuous = false;
-          recognition.lang = 'en-US';
-          
-          recognition.onstart = function() {
-            micButton.classList.add('active');
-            listeningIndicator.classList.add('active');
-            avatarContainer.classList.add('listening');
+        if (typeof window.speechSynthesis !== 'undefined') {
+            synth = window.speechSynthesis;
             
-            // When listening starts, show temporary text in input field
-            input.value = "Listening...";
-            input.disabled = true;
-            input.style.fontStyle = "italic";
-            input.style.color = "#11ba91";
-          };
-          
-          recognition.onresult = function(event) {
-            const transcript = event.results[0][0].transcript;
-            input.value = transcript;
-            input.style.fontStyle = "normal";
-            input.style.color = "#333";
-            input.disabled = false;
+            // Get available voices
+            const populateVoices = function() {
+                voices = synth.getVoices();
+            };
             
-            // Give a slight delay before processing the voice command
-            setTimeout(() => {
-              ChatGPT();
-            }, 500);
-          };
-          
-          recognition.onend = function() {
-            micButton.classList.remove('active');
-            listeningIndicator.classList.remove('active');
-            avatarContainer.classList.remove('listening');
-            
-            // Reset input field if no result
-            if (input.value === "Listening...") {
-              input.value = "";
-              input.disabled = false;
-              input.style.fontStyle = "normal";
-              input.style.color = "#333";
+            if (synth.onvoiceschanged !== undefined) {
+                synth.onvoiceschanged = populateVoices;
             }
             
-            // Auto start listening again after a delay if in auto mode
-            if (autoListeningMode && !synth.speaking) {
-              listeningTimeout = setTimeout(() => {
-                startListening();
-              }, 2000);
-            }
-          };
-          
-          recognition.onerror = function(event) {
-            console.error('Speech recognition error', event.error);
-            micButton.classList.remove('active');
-            listeningIndicator.classList.remove('active');
-            avatarContainer.classList.remove('listening');
-            input.value = "";
-            input.disabled = false;
-            input.style.fontStyle = "normal";
-            input.style.color = "#333";
-            
-            // Restart listening after error if in auto mode
-            if (autoListeningMode) {
-              listeningTimeout = setTimeout(() => {
-                startListening();
-              }, 3000);
-            }
-          };
+            populateVoices();
         }
         
-        // Function to start listening
+        // Setup speech recognition
+        let recognition = null;
+        
+        function setupSpeechRecognition(SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'en-US';
+            
+            recognition.onstart = function() {
+                micButton.classList.add('active');
+                listeningIndicator.classList.add('active');
+                avatarContainer.classList.add('listening');
+                
+                // When listening starts, show temporary text in input field
+                input.value = "Listening...";
+                input.disabled = true;
+                input.style.fontStyle = "italic";
+                input.style.color = "#11ba91";
+            };
+            
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                input.value = transcript;
+                input.style.fontStyle = "normal";
+                input.style.color = "#333";
+                input.disabled = false;
+                
+                // Give a slight delay before processing the voice command
+                setTimeout(() => {
+                    ChatGPT();
+                }, 500);
+            };
+            
+            recognition.onend = function() {
+                micButton.classList.remove('active');
+                listeningIndicator.classList.remove('active');
+                avatarContainer.classList.remove('listening');
+                
+                // Reset input field if no result
+                if (input.value === "Listening...") {
+                    input.value = "";
+                    input.disabled = false;
+                    input.style.fontStyle = "normal";
+                    input.style.color = "#333";
+                }
+                
+                // Auto start listening again after a delay if in auto mode
+                if (autoListeningMode && synth && !synth.speaking) {
+                    listeningTimeout = setTimeout(() => {
+                        startListening();
+                    }, 2000);
+                }
+            };
+            
+            recognition.onerror = function(event) {
+                console.error('Speech recognition error', event.error);
+                micButton.classList.remove('active');
+                listeningIndicator.classList.remove('active');
+                avatarContainer.classList.remove('listening');
+                input.value = "";
+                input.disabled = false;
+                input.style.fontStyle = "normal";
+                input.style.color = "#333";
+                
+                // Restart listening after error if in auto mode
+                if (autoListeningMode) {
+                    listeningTimeout = setTimeout(() => {
+                        startListening();
+                    }, 3000);
+                }
+            };
+        }
+        
+        // Function to safely start listening
         function startListening() {
-          if (recognition && !recognition.recognizing && !synth.speaking) {
-            try {
-              recognition.start();
-            } catch (error) {
-              console.log("Recognition already started");
+            if (recognition && !synth?.speaking) {
+                try {
+                    recognition.start();
+                } catch (error) {
+                    console.log("Recognition already started or error:", error);
+                }
             }
-          }
         }
         
-        // Mic button click handler
+        // Mic button click handler with fallback for unsupported browsers
         micButton.addEventListener('click', () => {
-          if (recognition) {
-            if (micButton.classList.contains('active')) {
-              recognition.stop();
-              autoListeningMode = false;
+            if (speechRecognitionSupported) {
+                if (micButton.classList.contains('active')) {
+                    if (recognition) recognition.stop();
+                    autoListeningMode = false;
+                } else {
+                    startListening();
+                    autoListeningMode = true;
+                }
             } else {
-              startListening();
-              autoListeningMode = true;
+                featureNotice.textContent = "Speech recognition is not supported in this environment";
+                featureNotice.style.display = "flex";
+                
+                setTimeout(() => {
+                    featureNotice.style.display = "none";
+                }, 3000);
             }
-          } else {
-            alert('Speech recognition is not supported in your browser');
-          }
         });
         
-        // Speak text function
+        // Speak text function with fallback
         function speakText(text) {
-          if (synth.speaking) {
-            synth.cancel();
-          }
-          
-          clearTimeout(listeningTimeout);
-          
-          const utterance = new SpeechSynthesisUtterance(text);
-          
-          // Select a good voice
-          let selectedVoice = voices.find(voice => 
-            voice.name.includes('Female') || 
-            voice.name.includes('Samantha') || 
-            voice.name.includes('Google')
-          );
-          
-          if (selectedVoice) {
-            utterance.voice = selectedVoice;
-          }
-          
-          utterance.pitch = 1;
-          utterance.rate = 1;
-          utterance.volume = 1;
-          
-          utterance.onstart = function() {
-            // Add speaking effects
-            avatarContainer.classList.add('speaking');
-          };
-          
-          utterance.onend = function() {
-            // Change back to default avatar and remove effects
-            avatar.src = defaultAvatarUrl;
-            volumeIndicator.classList.remove('active');
-            avatarContainer.classList.remove('speaking');
-            
-            // Restart auto-listening after speaking if in auto mode
-            if (autoListeningMode) {
-              listeningTimeout = setTimeout(() => {
-                startListening();
-              }, 1500);
+            if (!speechSynthesisSupported || !synth) {
+                // Just change the avatar temporarily if speech not supported
+                avatar.src = talkingAvatarUrl;
+                avatarContainer.classList.add('speaking');
+                
+                setTimeout(() => {
+                    avatar.src = defaultAvatarUrl;
+                    avatarContainer.classList.remove('speaking');
+                }, 3000);
+                
+                return;
             }
-          };
-          
-          synth.speak(utterance);
+            
+            if (synth.speaking) {
+                synth.cancel();
+            }
+            
+            clearTimeout(listeningTimeout);
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // Select a good voice
+            let selectedVoice = voices.find(voice => 
+                voice.name.includes('Female') || 
+                voice.name.includes('Samantha') || 
+                voice.name.includes('Google')
+            );
+            
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            }
+            
+            utterance.pitch = 1;
+            utterance.rate = 1;
+            utterance.volume = 1;
+            
+            utterance.onstart = function() {
+                // Add speaking effects
+                avatarContainer.classList.add('speaking');
+                avatar.src = talkingAvatarUrl;
+                volumeIndicator.classList.add('active');
+            };
+            
+            utterance.onend = function() {
+                // Change back to default avatar and remove effects
+                avatar.src = defaultAvatarUrl;
+                volumeIndicator.classList.remove('active');
+                avatarContainer.classList.remove('speaking');
+                
+                // Restart auto-listening after speaking if in auto mode
+                if (autoListeningMode) {
+                    listeningTimeout = setTimeout(() => {
+                        startListening();
+                    }, 1500);
+                }
+            };
+            
+            try {
+                synth.speak(utterance);
+            } catch (error) {
+                console.error("Speech synthesis error:", error);
+                avatar.src = defaultAvatarUrl;
+                volumeIndicator.classList.remove('active');
+                avatarContainer.classList.remove('speaking');
+            }
         }
 
         bottom.addEventListener("click", () => {
-          input.focus();
+            input.focus();
         });
 
         input.addEventListener("input", () => {
-          if (input.value.length > 0 && input.value !== "Listening...") {
-            sendbtn.style.color = "#11ba91";
-          } else {
-            sendbtn.style.color = "#dbdbdb";
-          }
+            if (input.value.length > 0 && input.value !== "Listening...") {
+                sendbtn.style.color = "#11ba91";
+            } else {
+                sendbtn.style.color = "#dbdbdb";
+            }
         });
 
         input.addEventListener("keypress", (event) => {
-          if (event.key === "Enter") {
-            ChatGPT();
-          }
+            if (event.key === "Enter") {
+                ChatGPT();
+            }
         });
 
         function getCurrentTime() {
-          const now = new Date();
-          return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            const now = new Date();
+            return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         }
 
         async function ChatGPT() {
-          if (
-            input.value !== "" &&
-            input.value !== null &&
-            input.value.length > 0 &&
-            input.value.trim() !== "" &&
-            input.value !== "Listening..."
-          ) {
-            sendbtn.style.color = "#dbdbdb";
+            if (
+                input.value !== "" &&
+                input.value !== null &&
+                input.value.length > 0 &&
+                input.value.trim() !== "" &&
+                input.value !== "Listening..."
+            ) {
+                sendbtn.style.color = "#dbdbdb";
 
-            // Auto-listening mode should pause during conversation
-            if (recognition && autoListeningMode) {
-              clearTimeout(listeningTimeout);
-              recognition.stop();
-            }
+                // Auto-listening mode should pause during conversation
+                if (recognition && autoListeningMode) {
+                    clearTimeout(listeningTimeout);
+                    try {
+                        recognition.stop();
+                    } catch (e) {
+                        // Ignore if not listening
+                    }
+                }
 
-            // Store user input and clear the input field
-            const userInput = input.value;
-            input.value = "";
+                // Store user input and clear the input field
+                const userInput = input.value;
+                input.value = "";
 
-            // Add user message with time
-            let li = document.createElement("li");
-            li.className = "schat";
-            li.textContent = userInput;
-            
-            // Add time element
-            let timeSpan = document.createElement("div");
-            timeSpan.className = "msg-time";
-            timeSpan.textContent = getCurrentTime();
-            li.appendChild(timeSpan);
-            
-            ul.appendChild(li);
-            $(".msgs_cont").scrollTop($(".msgs_cont")[0].scrollHeight);
+                // Add user message with time
+                let li = document.createElement("li");
+                li.className = "schat";
+                li.textContent = userInput;
+                
+                // Add time element
+                let timeSpan = document.createElement("div");
+                timeSpan.className = "msg-time";
+                timeSpan.textContent = getCurrentTime();
+                li.appendChild(timeSpan);
+                
+                ul.appendChild(li);
+                $(".msgs_cont").scrollTop($(".msgs_cont")[0].scrollHeight);
 
-            // Add typing animation
-            let typingAnimationDiv = document.createElement("div");
-            typingAnimationDiv.className = "typing-animation";
-            for (var i = 0; i < 3; i++) {
-              var dotSpan = document.createElement("span");
-              dotSpan.className = "dot";
-              typingAnimationDiv.appendChild(dotSpan);
-            }
+                // Add typing animation
+                let typingAnimationDiv = document.createElement("div");
+                typingAnimationDiv.className = "typing-animation";
+                for (var i = 0; i < 3; i++) {
+                    var dotSpan = document.createElement("span");
+                    dotSpan.className = "dot";
+                    typingAnimationDiv.appendChild(dotSpan);
+                }
 
-            let li2 = document.createElement("li");
-            li2.className = "rchat";
-            li2.appendChild(typingAnimationDiv);
-            
-            // Keep default avatar during typing animation
+                let li2 = document.createElement("li");
+                li2.className = "rchat";
+                li2.appendChild(typingAnimationDiv);
+                
+                // Keep default avatar during typing animation
+                
             avatar.src = defaultAvatarUrl;
 
             setTimeout(() => {
