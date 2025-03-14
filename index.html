@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A powerful Chatbot Assistant: Get answers, solutions, and engage in meaningful conversations."
+    />
+    <meta
+      name="keywords"
+      content="chatbot, AI, answers, solutions, conversations, Dazzlone"
+    />
+    <link rel="shortcut icon" href="" type="image/x-icon">
+    <meta name="author" content="TH3_BULL" />
+    <meta name="robots" content="index, follow" />
+    <meta name="og:title" property="og:title" content="Dazzlone AI" />
+    <meta
+      name="og:description"
+      property="og:description"
+      content="A powerful Chatbot Assistant: Get answers, solutions, and engage in meaningful conversations."
+    />
+    <meta
+      name="og:image"
+      property="og:image"
+      content="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhhH8Fy8MTPge0EQCU1LqX1X9dFM9-2vrs6v0EBVHKlyyOpTmY3BezscBcGbAAcTxamK4fBp3uTLQzk10K4u5eeA5ZIgnoHviNkfRHX64jI2-HHlsl9d4JG_rr8ksQdaDZVc0kXZYPdvqpsIGCN_v-AelJcZIBlmKSxZLS_-MTghsavn2yi5Lx4IZD2tQA/s800/WhatsAppVideo2025-01-10at9.29.03PM-ezgif.com-video-to-gif-converter.gif"
+    />
+    <script
+      src="https://kit.fontawesome.com/d3c9fc67a3.js"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <title>Dazzlone AI</title>
+
+    <style>
+      /* Reset and Base Styles */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      html, body {
+        height: 100%;
+        width: 100%;
+        background-color: #f5f5f5;
+      }
+
+      /* Main Container - Mobile Focused */
+      main {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background-color: #ffffff;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Header Styles */
+      .topper {
+        display: flex;
+        align-items: center;
+        padding: 15px 20px;
+        background: linear-gradient(135deg, #11ba91, #0d9676);
+        color: white;
+        height: 60px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+
+      .icon {
+        width: 32px;
+        height: 32px;
+        margin-right: 12px;
+        background-image: url('https://i.ibb.co/wfhP1tW/Q1v-JOp-removebg-preview.png');
+        background-size: cover;
+        background-position: center;
+      }
+
+      .name {
+        font-size: 22px;
+        font-weight: 600;
+      }
+
+      /* Avatar Container */
+      .avatar-container {
+        display: flex;
+        justify-content: center;
+        padding: 15px 0;
+        background-color: #f0f7f5;
+        border-bottom: 1px solid #e6e6e6;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .avatar-img {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        border: 3px solid #11ba91;
+        object-fit: cover;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        z-index: 1;
+      }
+
+      /* Avatar background effect for listening mode */
+      .avatar-container::after {
+        content: '';
+        position: absolute;
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(17, 186, 145, 0.4) 0%, rgba(17, 186, 145, 0) 70%);
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0);
+        transition: transform 0.5s ease;
+        z-index: 0;
+      }
+
+      .avatar-container.listening::after {
+        animation: pulseBackground 2s infinite;
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      @keyframes pulseBackground {
+        0% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+        50% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.3; }
+        100% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+      }
+
+      .mic-button {
+        position: absolute;
+        bottom: 10px;
+        right: 20px;
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background-color: #fa8900;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        color: white;
+        font-size: 20px;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        transition: all 0.3s ease;
+      }
+
+      .mic-button:hover {
+        transform: scale(1.05);
+        background-color: #0fa783;
+      }
+
+      .mic-button.active {
+        background-color: #ff4b4b;
+        animation: pulse 1.5s infinite;
+      }
+
+      @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+      }
+
+      /* Messages Container */
+      .msgs_cont {
+        flex: 1;
+        overflow-y: auto;
+        padding: 15px;
+        background-color: #f7f9fb;
+        scrollbar-width: thin;
+        background-image: url('https://i.imgur.com/WuFUYJQ.png');
+        background-size: 150px;
+        background-repeat: repeat;
+        background-opacity: 0.08;
+      }
+
+      .msgs_cont::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .msgs_cont::-webkit-scrollbar-thumb {
+        background-color: #d1d1d1;
+        border-radius: 10px;
+      }
+
+      #list_cont {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      /* Chat Bubbles */
+      .schat, .rchat {
+        max-width: 85%;
+        padding: 12px 14px;
+        border-radius: 18px;
+        word-wrap: break-word;
+        line-height: 1.4;
+        position: relative;
+        animation: fadeIn 0.3s ease-in-out;
+        font-size: 15px;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .schat {
+        align-self: flex-end;
+        background-color: #11ba91;
+        color: white;
+        border-bottom-right-radius: 4px;
+        margin-left: auto;
+      }
+
+      .rchat {
+        align-self: flex-start;
+        background-color: #ffffff;
+        color: #333333;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Input Area */
+      .bottom {
+        padding: 12px;
+        background-color: #ffffff;
+        border-top: 1px solid #e6e6e6;
+      }
+
+      #input {
+        display: flex;
+        align-items: center;
+        background-color: #f0f2f5;
+        border-radius: 24px;
+        padding: 6px 12px;
+        transition: all 0.3s ease;
+      }
+
+      #input:focus-within {
+        box-shadow: 0 0 0 2px rgba(17, 186, 145, 0.3);
+      }
+
+      #txt {
+        flex: 1;
+        border: none;
+        background: transparent;
+        padding: 8px 0;
+        outline: none;
+        font-size: 15px;
+        color: #333;
+      }
+
+      #txt::placeholder {
+        color: #999;
+      }
+
+      button.uil-message {
+        background: transparent;
+        border: none;
+        color: #dbdbdb;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 5px;
+        border-radius: 20%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+      }
+
+      button.uil-message:hover {
+        background-color: rgba(0, 210, 158, 0.1);
+      }
+
+      /* Typing Animation */
+      .typing-animation {
+        display: flex;
+        align-items: center;
+        column-gap: 5px;
+        padding: 6px 10px;
+      }
+
+      .dot {
+        height: 7px;
+        width: 7px;
+        border-radius: 50%;
+        background-color: #b6b6b6;
+        animation: typing 1.5s infinite ease-in-out;
+      }
+
+      .dot:nth-child(1) { animation-delay: 0s; }
+      .dot:nth-child(2) { animation-delay: 0.3s; }
+      .dot:nth-child(3) { animation-delay: 0.6s; }
+
+      @keyframes typing {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+      }
+
+      /* Status Indicators */
+      .status {
+        font-size: 12px;
+        color: #999;
+        margin-top: 4px;
+        text-align: right;
+      }
+
+      /* Message Time */
+      .msg-time {
+        font-size: 10px;
+        margin-top: 4px;
+        opacity: 0.7;
+      }
+
+      .schat .msg-time {
+        text-align: right;
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      .rchat .msg-time {
+        text-align: left;
+        color: #999;
+      }
+
+      /* Speech recognition animation - Improved */
+      .listening-indicator {
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(17, 186, 145, 0.9);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        display: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        z-index: 10;
+      }
+
+      .listening-indicator.active {
+        display: flex;
+        align-items: center;
+        animation: pulseFade 1.5s infinite;
+      }
+
+      .listening-indicator i {
+        margin-right: 5px;
+        font-size: 10px;
+        animation: blink 1s infinite;
+      }
+
+      @keyframes pulseFade {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.8; }
+      }
+
+      @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+
+      /* Volume indicator - Improved */
+    
+
+      .volume-indicator.active {
+        opacity: 1;
+        animation: softPulse 2s infinite;
+      }
+
+      /* Professional shadow effect for avatar when speaking */
+      .avatar-container.speaking {
+        overflow: visible;
+      }
+
+      .avatar-container.speaking .avatar-img {
+        box-shadow: 0 0 0 5px rgba(17, 186, 145, 0.2), 
+                    0 0 15px rgba(17, 186, 145, 0.4), 
+                    0 0 30px rgba(17, 186, 145, 0.1);
+        animation: speakingPulse 2s infinite;
+      }
+
+      @keyframes speakingPulse {
+        0% { transform: scale(1); box-shadow: 0 0 0 5px rgba(17, 186, 145, 0.2), 0 0 15px rgba(17, 186, 145, 0.4), 0 0 30px rgba(17, 186, 145, 0.1); }
+        50% { transform: scale(1.05); box-shadow: 0 0 0 8px rgba(17, 186, 145, 0.2), 0 0 20px rgba(17, 186, 145, 0.5), 0 0 40px rgba(17, 186, 145, 0.2); }
+        100% { transform: scale(1); box-shadow: 0 0 0 5px rgba(17, 186, 145, 0.2), 0 0 15px rgba(17, 186, 145, 0.4), 0 0 30px rgba(17, 186, 145, 0.1); }
+      }
+
+      @keyframes softPulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+      }
+      
+      /* Auto-Listening notice */
+      .auto-listening-notice {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(17, 186, 145, 0.9);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 50px;
+        font-size: 14px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        animation: noticeAppear 0.5s ease, noticeDisappear 0.5s ease 4.5s forwards;
+      }
+
+      .auto-listening-notice i {
+        margin-right: 8px;
+      }
+
+      @keyframes noticeAppear {
+        from { opacity: 0; transform: translate(-50%, -20px); }
+        to { opacity: 1; transform: translate(-50%, 0); }
+      }
+
+      @keyframes noticeDisappear {
+        from { opacity: 1; transform: translate(-50%, 0); }
+        to { opacity: 0; transform: translate(-50%, -20px); }
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <div class="topper">
+        <div class="icon"></div>
+        <div class="name">Dazzlone AI</div>
+      </div>
+      
+      <div class="avatar-container">
+        <img id="avatar" class="avatar-img" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhhH8Fy8MTPge0EQCU1LqX1X9dFM9-2vrs6v0EBVHKlyyOpTmY3BezscBcGbAAcTxamK4fBp3uTLQzk10K4u5eeA5ZIgnoHviNkfRHX64jI2-HHlsl9d4JG_rr8ksQdaDZVc0kXZYPdvqpsIGCN_v-AelJcZIBlmKSxZLS_-MTghsavn2yi5Lx4IZD2tQA/s800/WhatsAppVideo2025-01-10at9.29.03PM-ezgif.com-video-to-gif-converter.gif" alt="Dazzlone AI Avatar">
+        <button id="mic-button" class="mic-button">
+          <i class="fas fa-microphone"></i>
+        </button>
+        <div class="listening-indicator"><i class="fas fa-circle"></i> Listening...</div>
+        <div class="volume-indicator">
+          <i class="fas fa-volume-up"></i>
+        </div>
+      </div>
+      
+      <div class="msgs_cont">
+        <ul id="list_cont">
+          <li class="rchat">Hey there! 👋 I'm Dazzlone, your AI assistant. How can I help you today?</li>
+        </ul>
+      </div>
+      <div class="bottom">
+        <div id="input">
+          <input type="text" id="txt" placeholder="Send a message" />
+          <button class="uil-message"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        let bottom = document.querySelector(".bottom");
+        let input = document.querySelector("#txt");
+        let sendbtn = document.querySelector(".uil-message");
+        let ul = document.querySelector("#list_cont");
+        let avatar = document.getElementById("avatar");
+        let micButton = document.getElementById("mic-button");
+        let listeningIndicator = document.querySelector(".listening-indicator");
+        let volumeIndicator = document.querySelector(".volume-indicator");
+        let avatarContainer = document.querySelector(".avatar-container");
+        
+        // Auto-listening mode
+        let autoListeningMode = true;
+        let listeningTimeout = null;
+        
+        // Default avatar and talking avatar URLs
+        const defaultAvatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhhH8Fy8MTPge0EQCU1LqX1X9dFM9-2vrs6v0EBVHKlyyOpTmY3BezscBcGbAAcTxamK4fBp3uTLQzk10K4u5eeA5ZIgnoHviNkfRHX64jI2-HHlsl9d4JG_rr8ksQdaDZVc0kXZYPdvqpsIGCN_v-AelJcZIBlmKSxZLS_-MTghsavn2yi5Lx4IZD2tQA/s800/WhatsAppVideo2025-01-10at9.29.03PM-ezgif.com-video-to-gif-converter.gif";
+        const talkingAvatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhlLmZw1azadUdBSMQjrIZPx5uONLyewoDxZh5EYn6aL0qmnIzzIJpuazFzbjDysUYwxURX8mp_7cGFh4g9q_3IAT16v0eYlW9YhTpXULByDkLXAYLB-hfMXghliccmRmFG02o4kTt3eZEpo8CHUrPr0p1IIYCrhe7QEdOKaqEzWk7WtQMgaAHt0MYlF0A/s2566/aivideo.gif";
+        
+        // Speech synthesis setup
+        const synth = window.speechSynthesis;
+        let voices = [];
+        
+        // Get available voices
+        function populateVoices() {
+          voices = synth.getVoices();
+        }
+        
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+          speechSynthesis.onvoiceschanged = populateVoices;
+        }
+        
+        populateVoices();
+        
+        // Speech recognition setup
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+        
+        if (recognition) {
+          recognition.continuous = false;
+          recognition.lang = 'en-US';
+          
+          recognition.onstart = function() {
+            micButton.classList.add('active');
+            listeningIndicator.classList.add('active');
+            avatarContainer.classList.add('listening');
+            
+            // When listening starts, show temporary text in input field
+            input.value = "Listening...";
+            input.disabled = true;
+            input.style.fontStyle = "italic";
+            input.style.color = "#11ba91";
+          };
+          
+          recognition.onresult = function(event) {
+            const transcript = event.results[0][0].transcript;
+            input.value = transcript;
+            input.style.fontStyle = "normal";
+            input.style.color = "#333";
+            input.disabled = false;
+            
+            // Give a slight delay before processing the voice command
+            setTimeout(() => {
+              ChatGPT();
+            }, 500);
+          };
+          
+          recognition.onend = function() {
+            micButton.classList.remove('active');
+            listeningIndicator.classList.remove('active');
+            avatarContainer.classList.remove('listening');
+            
+            // Reset input field if no result
+            if (input.value === "Listening...") {
+              input.value = "";
+              input.disabled = false;
+              input.style.fontStyle = "normal";
+              input.style.color = "#333";
+            }
+            
+            // Auto start listening again after a delay if in auto mode
+            if (autoListeningMode && !synth.speaking) {
+              listeningTimeout = setTimeout(() => {
+                startListening();
+              }, 2000);
+            }
+          };
+          
+          recognition.onerror = function(event) {
+            console.error('Speech recognition error', event.error);
+            micButton.classList.remove('active');
+            listeningIndicator.classList.remove('active');
+            avatarContainer.classList.remove('listening');
+            input.value = "";
+            input.disabled = false;
+            input.style.fontStyle = "normal";
+            input.style.color = "#333";
+            
+            // Restart listening after error if in auto mode
+            if (autoListeningMode) {
+              listeningTimeout = setTimeout(() => {
+                startListening();
+              }, 3000);
+            }
+          };
+        }
+        
+        // Function to start listening
+        function startListening() {
+          if (recognition && !recognition.recognizing && !synth.speaking) {
+            try {
+              recognition.start();
+            } catch (error) {
+              console.log("Recognition already started");
+            }
+          }
+        }
+        
+        // Mic button click handler
+        micButton.addEventListener('click', () => {
+          if (recognition) {
+            if (micButton.classList.contains('active')) {
+              recognition.stop();
+              autoListeningMode = false;
+            } else {
+              startListening();
+              autoListeningMode = true;
+            }
+          } else {
+            alert('Speech recognition is not supported in your browser');
+          }
+        });
+        
+        // Speak text function
+        function speakText(text) {
+          if (synth.speaking) {
+            synth.cancel();
+          }
+          
+          clearTimeout(listeningTimeout);
+          
+          const utterance = new SpeechSynthesisUtterance(text);
+          
+          // Select a good voice
+          let selectedVoice = voices.find(voice => 
+            voice.name.includes('Female') || 
+            voice.name.includes('Samantha') || 
+            voice.name.includes('Google')
+          );
+          
+          if (selectedVoice) {
+            utterance.voice = selectedVoice;
+          }
+          
+          utterance.pitch = 1;
+          utterance.rate = 1;
+          utterance.volume = 1;
+          
+          utterance.onstart = function() {
+            // Add speaking effects
+            avatarContainer.classList.add('speaking');
+          };
+          
+          utterance.onend = function() {
+            // Change back to default avatar and remove effects
+            avatar.src = defaultAvatarUrl;
+            volumeIndicator.classList.remove('active');
+            avatarContainer.classList.remove('speaking');
+            
+            // Restart auto-listening after speaking if in auto mode
+            if (autoListeningMode) {
+              listeningTimeout = setTimeout(() => {
+                startListening();
+              }, 1500);
+            }
+          };
+          
+          synth.speak(utterance);
+        }
+
+        bottom.addEventListener("click", () => {
+          input.focus();
+        });
+
+        input.addEventListener("input", () => {
+          if (input.value.length > 0 && input.value !== "Listening...") {
+            sendbtn.style.color = "#11ba91";
+          } else {
+            sendbtn.style.color = "#dbdbdb";
+          }
+        });
+
+        input.addEventListener("keypress", (event) => {
+          if (event.key === "Enter") {
+            ChatGPT();
+          }
+        });
+
+        function getCurrentTime() {
+          const now = new Date();
+          return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        async function ChatGPT() {
+          if (
+            input.value !== "" &&
+            input.value !== null &&
+            input.value.length > 0 &&
+            input.value.trim() !== "" &&
+            input.value !== "Listening..."
+          ) {
+            sendbtn.style.color = "#dbdbdb";
+
+            // Auto-listening mode should pause during conversation
+            if (recognition && autoListeningMode) {
+              clearTimeout(listeningTimeout);
+              recognition.stop();
+            }
+
+            // Store user input and clear the input field
+            const userInput = input.value;
+            input.value = "";
+
+            // Add user message with time
+            let li = document.createElement("li");
+            li.className = "schat";
+            li.textContent = userInput;
+            
+            // Add time element
+            let timeSpan = document.createElement("div");
+            timeSpan.className = "msg-time";
+            timeSpan.textContent = getCurrentTime();
+            li.appendChild(timeSpan);
+            
+            ul.appendChild(li);
+            $(".msgs_cont").scrollTop($(".msgs_cont")[0].scrollHeight);
+
+            // Add typing animation
+            let typingAnimationDiv = document.createElement("div");
+            typingAnimationDiv.className = "typing-animation";
+            for (var i = 0; i < 3; i++) {
+              var dotSpan = document.createElement("span");
+              dotSpan.className = "dot";
+              typingAnimationDiv.appendChild(dotSpan);
+            }
+
+            let li2 = document.createElement("li");
+            li2.className = "rchat";
+            li2.appendChild(typingAnimationDiv);
+            
+            // Keep default avatar during typing animation
+            avatar.src = defaultAvatarUrl;
+
+            setTimeout(() => {
+              ul.appendChild(li2);
+              $(".msgs_cont").scrollTop($(".msgs_cont")[0].scrollHeight);
+            }, 500);
+
+            sendbtn.disabled = true;
+            input.disabled = true;
+
+            // Gemini API Integration
+            const apiKey = "AIzaSyDhDhiKFkaYAp-o0lGL4e4uJSYIJSh6paY";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+            const requestOptions = {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: userInput,
+                      },
+                    ],
+                  },
+                ],
+              }),
+            };
+
+            try {
+              const response = await fetch(apiUrl, requestOptions);
+              const data = await response.json();
+
+              // Extract the response text
+              let apiResponse = data.candidates[0].content.parts[0].text.trim();
+
+              // Replace "Google" with "Dazzlone"
+              apiResponse = apiResponse.replace(/\bGoogle\b/g, "Dazzlone");
+
+              // Clear typing animation
+              li2.innerHTML = "";
+              
+              // Change to talking avatar when response is ready and speaking begins
+              avatar.src = talkingAvatarUrl;
+              volumeIndicator.classList.add('active');
+              
+              // Start speech synthesis
+              speakText(apiResponse);
+              
+              // Display the response with typing effect
+              let responseText = "";
+              let i = 0;
+              const intervalId = setInterval(() => {
+                if (i < apiResponse.length) {
+                  responseText += apiResponse[i];
+                  li2.textContent = responseText;
+                  $(".msgs_cont").scrollTop($(".msgs_cont")[0].scrollHeight);
+                  i++;
+                } else {
+                  clearInterval(intervalId);
+                  
+                  // Add time element to response
+                  let responseTimeSpan = document.createElement("div");
+                  responseTimeSpan.className = "msg-time";
+                  responseTimeSpan.textContent = getCurrentTime();
+                  li2.appendChild(responseTimeSpan);
+                  
+                  sendbtn.disabled = false;
+                  input.disabled = false;
+                  input.focus();
+                }
+              }, 15);
+              
+            } catch (error) {
+              li2.textContent = "Sorry, something went wrong. Please try again.";
+              
+              // Add time element
+              let errorTimeSpan = document.createElement("div");
+              errorTimeSpan.className = "msg-time";
+              errorTimeSpan.textContent = getCurrentTime();
+              li2.appendChild(errorTimeSpan);
+              
+              $(".msgs_cont").scrollTop($(".msgs_cont")[0].scrollHeight);
+              sendbtn.disabled = false;
+              input.disabled = false;
+              
+              // Change back to default avatar
+              avatar.src = defaultAvatarUrl;
+              volumeIndicator.classList.remove('active');
+            }
+          }
+        }
+
+        sendbtn.addEventListener("click", ChatGPT);
+        
+        // Play notification sound on page load
+        function playWelcomeSound() {
+          const audio = new Audio("https://www.soundjay.com/buttons/sounds/button-09.mp3");
+          audio.volume = 0.5;
+          
+          // Wait for user interaction before playing sound
+          document.addEventListener('click', function playSound() {
+            audio.play();
+            
+            // Speak welcome message after a short delay
+            setTimeout(() => {
+              // Change to talking avatar only when speaking
+              avatar.src = talkingAvatarUrl;
+              volumeIndicator.classList.add('active');
+              speakText("Hey there! I'm Dazzlone, your AI assistant. How can I help you today?");
+            }, 500);
+            
+            document.removeEventListener('click', playSound);
+          }, { once: true });
+        }
+        
+        playWelcomeSound();
+      });
+    </script>
+  </body>
+</html>
