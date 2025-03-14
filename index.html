@@ -472,7 +472,7 @@
     </main>
 
     <script>
- document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", function () {
   let bottom = document.querySelector(".bottom");
   let input = document.querySelector("#txt");
   let sendbtn = document.querySelector(".uil-message");
@@ -491,6 +491,25 @@
   const defaultAvatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhhH8Fy8MTPge0EQCU1LqX1X9dFM9-2vrs6v0EBVHKlyyOpTmY3BezscBcGbAAcTxamK4fBp3uTLQzk10K4u5eeA5ZIgnoHviNkfRHX64jI2-HHlsl9d4JG_rr8ksQdaDZVc0kXZYPdvqpsIGCN_v-AelJcZIBlmKSxZLS_-MTghsavn2yi5Lx4IZD2tQA/s800/WhatsAppVideo2025-01-10at9.29.03PM-ezgif.com-video-to-gif-converter.gif";
   const talkingAvatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhlLmZw1azadUdBSMQjrIZPx5uONLyewoDxZh5EYn6aL0qmnIzzIJpuazFzbjDysUYwxURX8mp_7cGFh4g9q_3IAT16v0eYlW9YhTpXULByDkLXAYLB-hfMXghliccmRmFG02o4kTt3eZEpo8CHUrPr0p1IIYCrhe7QEdOKaqEzWk7WtQMgaAHt0MYlF0A/s2566/aivideo.gif";
   
+  // Audio context for fallback sound generation
+  let audioContext = null;
+  try {
+    // Fix for autoplay policy in WebView
+    window.AudioContext = window.AudioContext || window.webkitAudioContext;
+    audioContext = new AudioContext();
+    
+    // Create a dummy oscillator and connect it to prevent audio issues
+    let oscillator = audioContext.createOscillator();
+    let gainNode = audioContext.createGain();
+    gainNode.gain.value = 0; // Mute it
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.001);
+  } catch (e) {
+    console.log("Audio Context not supported:", e);
+  }
+  
   // Speech synthesis feature detection with fallback
   let synth = null;
   let speechSupported = false;
@@ -498,6 +517,18 @@
   try {
     synth = window.speechSynthesis;
     speechSupported = synth !== undefined && synth !== null;
+    
+    // Try to resume the speech synthesis in case it was paused
+    if (speechSupported) {
+      synth.cancel();
+      setTimeout(() => {
+        try {
+          synth.resume();
+        } catch (e) {
+          console.log("Error resuming speech synthesis:", e);
+        }
+      }, 500);
+    }
   } catch (e) {
     console.log("Speech synthesis not supported");
     speechSupported = false;
@@ -662,72 +693,151 @@
     });
   }
   
-  // Speak text function with error handling
-  function speakText(text) {
-    if (!speechSupported) {
-      // Fallback for non-speech environments - just animate the avatar
-      handleAvatarTalking(text);
-      return;
-    }
-    
+  // Fallback sound for WebView
+  function playFallbackSound() {
     try {
-      if (synth.speaking) {
-        synth.cancel();
-      }
-      
-      clearTimeout(listeningTimeout);
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      
-      // Select a good voice
-      let selectedVoice = null;
-      
-      if (voices.length > 0) {
-        selectedVoice = voices.find(voice => 
-          voice.name.includes('Female') || 
-          voice.name.includes('Samantha') || 
-          voice.name.includes('Google')
-        );
-      }
-      
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
-      
-      utterance.pitch = 1;
-      utterance.rate = 1;
-      utterance.volume = 1;
-      
-      utterance.onstart = function() {
-        // Add speaking effects
-        avatarContainer.classList.add('speaking');
-        avatar.src = talkingAvatarUrl;
-        volumeIndicator.classList.add('active');
-      };
-      
-      utterance.onend = function() {
-        // Change back to default avatar and remove effects
-        avatar.src = defaultAvatarUrl;
-        volumeIndicator.classList.remove('active');
-        avatarContainer.classList.remove('speaking');
-        
-        // Restart auto-listening after speaking if in auto mode
-        if (autoListeningMode && recognitionSupported) {
-          listeningTimeout = setTimeout(() => {
-            startListening();
-          }, 1500);
+      if (audioContext) {
+        // Resume audio context if it's suspended (needed for WebView)
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
         }
-      };
-      
-      synth.speak(utterance);
+        
+        // Create a short beep sound
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.value = 440; // A4 note
+        gainNode.gain.value = 0.1; // Lower volume
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.start();
+        
+        // Stop after 100ms
+        setTimeout(() => {
+          oscillator.stop();
+        }, 100);
+      }
     } catch (e) {
-      console.log("Speech synthesis error:", e);
-      // Fallback animation if speech fails
-      handleAvatarTalking(text);
+      console.log("Error playing fallback sound:", e);
     }
   }
   
-  // Fallback animation for WebView environments without speech synthesis
+  // Alternative audio method for WebView
+  function playNotificationSound() {
+    try {
+      const audio = new Audio("https://www.soundjay.com/buttons/sounds/button-09.mp3");
+      audio.volume = 0.5;
+      
+      // Add event listeners for debugging
+      audio.addEventListener('play', () => console.log('Audio started playing'));
+      audio.addEventListener('error', (e) => console.log('Audio error:', e));
+      
+      // Use both play() and the Web Audio API as fallback
+      const playPromise = audio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          console.log('Audio playback started successfully');
+        }).catch(error => {
+          console.log('Audio playback failed:', error);
+          // Try fallback sound
+          playFallbackSound();
+        });
+      }
+    } catch (e) {
+      console.log("Error playing notification sound:", e);
+      // Try fallback sound
+      playFallbackSound();
+    }
+  }
+  
+  // Text-to-speech function with WebView compatibility
+  function speakText(text) {
+    // Animate the avatar in all cases
+    handleAvatarTalking(text);
+    
+    // Try to use speech synthesis if supported
+    if (speechSupported) {
+      try {
+        if (synth.speaking) {
+          synth.cancel();
+        }
+        
+        clearTimeout(listeningTimeout);
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        // Select a good voice
+        let selectedVoice = null;
+        
+        if (voices.length > 0) {
+          selectedVoice = voices.find(voice => 
+            voice.name.includes('Female') || 
+            voice.name.includes('Samantha') || 
+            voice.name.includes('Google')
+          );
+        }
+        
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
+        
+        utterance.pitch = 1;
+        utterance.rate = 1;
+        utterance.volume = 1;
+        
+        // Handle WebView auto-play restrictions
+        let started = false;
+        
+        utterance.onstart = function() {
+          started = true;
+          // Add speaking effects
+          avatarContainer.classList.add('speaking');
+          avatar.src = talkingAvatarUrl;
+          volumeIndicator.classList.add('active');
+          
+          // Try to play a sound to keep audio context active
+          playFallbackSound();
+        };
+        
+        utterance.onend = function() {
+          // Only change back if speech actually started
+          if (started) {
+            // Change back to default avatar and remove effects
+            avatar.src = defaultAvatarUrl;
+            volumeIndicator.classList.remove('active');
+            avatarContainer.classList.remove('speaking');
+            
+            // Restart auto-listening after speaking if in auto mode
+            if (autoListeningMode && recognitionSupported) {
+              listeningTimeout = setTimeout(() => {
+                startListening();
+              }, 1500);
+            }
+          }
+        };
+        
+        // Set a timeout to check if speech actually started
+        setTimeout(() => {
+          if (!started) {
+            console.log("Speech synthesis failed to start, using fallback");
+            // Speech synthesis failed, use only avatar animation
+            // (already handled by handleAvatarTalking)
+          }
+        }, 500);
+        
+        synth.speak(utterance);
+      } catch (e) {
+        console.log("Speech synthesis error:", e);
+        // Fallback animation already handled by handleAvatarTalking
+      }
+    }
+  }
+  
+  // Improved avatar animation for WebView environments
   function handleAvatarTalking(text) {
     // Animate avatar for approximately the time it would take to speak the text
     const wordsCount = text.split(' ').length;
@@ -738,11 +848,17 @@
     avatarContainer.classList.add('speaking');
     volumeIndicator.classList.add('active');
     
+    // Play a sound to indicate talking started
+    playFallbackSound();
+    
     // Return to default after estimated speaking time
     setTimeout(() => {
       avatar.src = defaultAvatarUrl;
       volumeIndicator.classList.remove('active');
       avatarContainer.classList.remove('speaking');
+      
+      // Play a sound to indicate talking ended
+      playFallbackSound();
       
       // Restart auto-listening after animation if in auto mode
       if (autoListeningMode && recognitionSupported) {
@@ -770,6 +886,7 @@
       ChatGPT();
     }
   });
+
 
   function getCurrentTime() {
     const now = new Date();
