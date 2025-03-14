@@ -181,6 +181,7 @@
         background-image: url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS2FKWGCyLI9Ao9AJppnVDSihZtrAvrzMqkaA&s');
         background-size: 150px;
         background-repeat: repeat;
+        background-opacity: 0.08;
       }
 
       .msgs_cont::-webkit-scrollbar {
@@ -374,16 +375,8 @@
         50% { opacity: 0; }
       }
 
-      /* Volume indicator */
-      .volume-indicator {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        font-size: 14px;
-        color: #11ba91;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-      }
+      /* Volume indicator - Improved */
+    
 
       .volume-indicator.active {
         opacity: 1;
@@ -413,25 +406,36 @@
         50% { transform: scale(1.1); }
       }
       
-      /* Speech feature notice */
-      .feature-notice {
+      /* Auto-Listening notice */
+      .auto-listening-notice {
         position: fixed;
-        bottom: 70px;
+        top: 20px;
         left: 50%;
         transform: translateX(-50%);
-        background-color: rgba(255, 137, 0, 0.9);
+        background-color: rgba(17, 186, 145, 0.9);
         color: white;
-        padding: 8px 15px;
+        padding: 10px 20px;
         border-radius: 50px;
-        font-size: 12px;
+        font-size: 14px;
         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
         z-index: 100;
-        display: none;
+        display: flex;
         align-items: center;
+        animation: noticeAppear 0.5s ease, noticeDisappear 0.5s ease 4.5s forwards;
       }
 
-      .feature-notice i {
+      .auto-listening-notice i {
         margin-right: 8px;
+      }
+
+      @keyframes noticeAppear {
+        from { opacity: 0; transform: translate(-50%, -20px); }
+        to { opacity: 1; transform: translate(-50%, 0); }
+      }
+
+      @keyframes noticeDisappear {
+        from { opacity: 1; transform: translate(-50%, 0); }
+        to { opacity: 0; transform: translate(-50%, -20px); }
       }
     </style>
   </head>
@@ -465,392 +469,427 @@
           <button class="uil-message">➤</button>
         </div>
       </div>
-
-      <div class="feature-notice">
-        <i class="fas fa-info-circle"></i>
-        <span id="feature-notice-text">Speech features might not work in all environments</span>
-      </div>
     </main>
 
     <script>
-      document.addEventListener("DOMContentLoaded", function () {
-        let bottom = document.querySelector(".bottom");
-        let input = document.querySelector("#txt");
-        let sendbtn = document.querySelector(".uil-message");
-        let ul = document.querySelector("#list_cont");
-        let avatar = document.getElementById("avatar");
-        let micButton = document.getElementById("mic-button");
-        let listeningIndicator = document.querySelector(".listening-indicator");
-        let volumeIndicator = document.querySelector(".volume-indicator");
-        let avatarContainer = document.querySelector(".avatar-container");
-        let featureNotice = document.querySelector(".feature-notice");
+ document.addEventListener("DOMContentLoaded", function () {
+  let bottom = document.querySelector(".bottom");
+  let input = document.querySelector("#txt");
+  let sendbtn = document.querySelector(".uil-message");
+  let ul = document.querySelector("#list_cont");
+  let avatar = document.getElementById("avatar");
+  let micButton = document.getElementById("mic-button");
+  let listeningIndicator = document.querySelector(".listening-indicator");
+  let volumeIndicator = document.querySelector(".volume-indicator");
+  let avatarContainer = document.querySelector(".avatar-container");
+  
+  // Auto-listening mode
+  let autoListeningMode = false; // Set to false by default for WebView compatibility
+  let listeningTimeout = null;
+  
+  // Default avatar and talking avatar URLs
+  const defaultAvatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhhH8Fy8MTPge0EQCU1LqX1X9dFM9-2vrs6v0EBVHKlyyOpTmY3BezscBcGbAAcTxamK4fBp3uTLQzk10K4u5eeA5ZIgnoHviNkfRHX64jI2-HHlsl9d4JG_rr8ksQdaDZVc0kXZYPdvqpsIGCN_v-AelJcZIBlmKSxZLS_-MTghsavn2yi5Lx4IZD2tQA/s800/WhatsAppVideo2025-01-10at9.29.03PM-ezgif.com-video-to-gif-converter.gif";
+  const talkingAvatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhlLmZw1azadUdBSMQjrIZPx5uONLyewoDxZh5EYn6aL0qmnIzzIJpuazFzbjDysUYwxURX8mp_7cGFh4g9q_3IAT16v0eYlW9YhTpXULByDkLXAYLB-hfMXghliccmRmFG02o4kTt3eZEpo8CHUrPr0p1IIYCrhe7QEdOKaqEzWk7WtQMgaAHt0MYlF0A/s2566/aivideo.gif";
+  
+  // Speech synthesis feature detection with fallback
+  let synth = null;
+  let speechSupported = false;
+  
+  try {
+    synth = window.speechSynthesis;
+    speechSupported = synth !== undefined && synth !== null;
+  } catch (e) {
+    console.log("Speech synthesis not supported");
+    speechSupported = false;
+  }
+  
+  let voices = [];
+  
+  // Get available voices only if speech synthesis is supported
+  function populateVoices() {
+    try {
+      if (speechSupported) {
+        voices = synth.getVoices();
+      }
+    } catch (e) {
+      console.log("Error getting voices:", e);
+    }
+  }
+  
+  // Only set up voice changed event if speech synthesis is supported
+  if (speechSupported && synth.onvoiceschanged !== undefined) {
+    try {
+      synth.onvoiceschanged = populateVoices;
+    } catch (e) {
+      console.log("Error setting onvoiceschanged:", e);
+    }
+  }
+  
+  if (speechSupported) {
+    populateVoices();
+  }
+  
+  // Speech recognition setup with better error handling
+  let recognition = null;
+  let recognitionSupported = false;
+  
+  try {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognitionSupported = SpeechRecognition !== undefined && SpeechRecognition !== null;
+    
+    if (recognitionSupported) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = 'en-US';
+      
+      recognition.onstart = function() {
+        micButton.classList.add('active');
+        listeningIndicator.classList.add('active');
+        avatarContainer.classList.add('listening');
         
-        // Feature detection flags
-        let speechRecognitionSupported = false;
-        let speechSynthesisSupported = false;
+        // When listening starts, show temporary text in input field
+        input.value = "Listening...";
+        input.disabled = true;
+        input.style.fontStyle = "italic";
+        input.style.color = "#11ba91";
+      };
+      
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        input.value = transcript;
+        input.style.fontStyle = "normal";
+        input.style.color = "#333";
+        input.disabled = false;
         
-        // Auto-listening mode - start with it off
-        let autoListeningMode = false;
-        let listeningTimeout = null;
+        // Give a slight delay before processing the voice command
+        setTimeout(() => {
+          ChatGPT();
+        }, 500);
+      };
+      
+      recognition.onend = function() {
+        micButton.classList.remove('active');
+        listeningIndicator.classList.remove('active');
+        avatarContainer.classList.remove('listening');
         
-        // Default avatar and talking avatar URLs
-        const defaultAvatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhhH8Fy8MTPge0EQCU1LqX1X9dFM9-2vrs6v0EBVHKlyyOpTmY3BezscBcGbAAcTxamK4fBp3uTLQzk10K4u5eeA5ZIgnoHviNkfRHX64jI2-HHlsl9d4JG_rr8ksQdaDZVc0kXZYPdvqpsIGCN_v-AelJcZIBlmKSxZLS_-MTghsavn2yi5Lx4IZD2tQA/s800/WhatsAppVideo2025-01-10at9.29.03PM-ezgif.com-video-to-gif-converter.gif";
-        const talkingAvatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhlLmZw1azadUdBSMQjrIZPx5uONLyewoDxZh5EYn6aL0qmnIzzIJpuazFzbjDysUYwxURX8mp_7cGFh4g9q_3IAT16v0eYlW9YhTpXULByDkLXAYLB-hfMXghliccmRmFG02o4kTt3eZEpo8CHUrPr0p1IIYCrhe7QEdOKaqEzWk7WtQMgaAHt0MYlF0A/s2566/aivideo.gif";
-        
-        // Speech feature setup and detection
-        const setupSpeechFeatures = function() {
-            // Check for speech synthesis support
-            if (typeof window.speechSynthesis !== 'undefined') {
-                speechSynthesisSupported = true;
-            } else {
-                console.log("Speech synthesis not supported");
-            }
-            
-            // Check for speech recognition support
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRecognition) {
-                speechRecognitionSupported = true;
-                setupSpeechRecognition(SpeechRecognition);
-            } else {
-                console.log("Speech recognition not supported");
-                micButton.style.display = "none";
-            }
-            
-            // Show notice if either feature is not supported
-            if (!speechSynthesisSupported || !speechRecognitionSupported) {
-                featureNotice.textContent = "Some speech features are not supported in your browser";
-                featureNotice.style.display = "flex";
-                
-                // Hide after 5 seconds
-                setTimeout(() => {
-                    featureNotice.style.display = "none";
-                }, 5000);
-            }
-        };
-        
-        // Setup speech synthesis
-        let synth = null;
-        let voices = [];
-        
-        if (typeof window.speechSynthesis !== 'undefined') {
-            synth = window.speechSynthesis;
-            
-            // Get available voices
-            const populateVoices = function() {
-                voices = synth.getVoices();
-            };
-            
-            if (synth.onvoiceschanged !== undefined) {
-                synth.onvoiceschanged = populateVoices;
-            }
-            
-            populateVoices();
+        // Reset input field if no result
+        if (input.value === "Listening...") {
+          input.value = "";
+          input.disabled = false;
+          input.style.fontStyle = "normal";
+          input.style.color = "#333";
         }
         
-        // Setup speech recognition
-        let recognition = null;
+        // Auto start listening again after a delay if in auto mode
+        if (autoListeningMode && (!speechSupported || !synth.speaking)) {
+          listeningTimeout = setTimeout(() => {
+            startListening();
+          }, 2000);
+        }
+      };
+      
+      recognition.onerror = function(event) {
+        console.error('Speech recognition error', event.error);
+        micButton.classList.remove('active');
+        listeningIndicator.classList.remove('active');
+        avatarContainer.classList.remove('listening');
+        input.value = "";
+        input.disabled = false;
+        input.style.fontStyle = "normal";
+        input.style.color = "#333";
         
-        function setupSpeechRecognition(SpeechRecognition) {
-            recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.lang = 'en-US';
-            
-            recognition.onstart = function() {
-                micButton.classList.add('active');
-                listeningIndicator.classList.add('active');
-                avatarContainer.classList.add('listening');
-                
-                // When listening starts, show temporary text in input field
-                input.value = "Listening...";
-                input.disabled = true;
-                input.style.fontStyle = "italic";
-                input.style.color = "#11ba91";
-            };
-            
-            recognition.onresult = function(event) {
-                const transcript = event.results[0][0].transcript;
-                input.value = transcript;
-                input.style.fontStyle = "normal";
-                input.style.color = "#333";
-                input.disabled = false;
-                
-                // Give a slight delay before processing the voice command
-                setTimeout(() => {
-                    ChatGPT();
-                }, 500);
-            };
-            
-            recognition.onend = function() {
-                micButton.classList.remove('active');
-                listeningIndicator.classList.remove('active');
-                avatarContainer.classList.remove('listening');
-                
-                // Reset input field if no result
-                if (input.value === "Listening...") {
-                    input.value = "";
-                    input.disabled = false;
-                    input.style.fontStyle = "normal";
-                    input.style.color = "#333";
-                }
-                
-                // Auto start listening again after a delay if in auto mode
-                if (autoListeningMode && synth && !synth.speaking) {
-                    listeningTimeout = setTimeout(() => {
-                        startListening();
-                    }, 2000);
-                }
-            };
-            
-            recognition.onerror = function(event) {
-                console.error('Speech recognition error', event.error);
-                micButton.classList.remove('active');
-                listeningIndicator.classList.remove('active');
-                avatarContainer.classList.remove('listening');
-                input.value = "";
-                input.disabled = false;
-                input.style.fontStyle = "normal";
-                input.style.color = "#333";
-                
-                // Restart listening after error if in auto mode
-                if (autoListeningMode) {
-                    listeningTimeout = setTimeout(() => {
-                        startListening();
-                    }, 3000);
-                }
-            };
+        // Restart listening after error if in auto mode
+        if (autoListeningMode) {
+          listeningTimeout = setTimeout(() => {
+            startListening();
+          }, 3000);
+        }
+      };
+    }
+  } catch (e) {
+    console.log("Speech recognition not supported:", e);
+    recognitionSupported = false;
+  }
+  
+  // Function to start listening with error handling
+  function startListening() {
+    if (recognitionSupported && recognition) {
+      try {
+        // Check if recognition is already active
+        if (micButton.classList.contains('active')) {
+          return;
         }
         
-        // Function to safely start listening
-        function startListening() {
-            if (recognition && !synth?.speaking) {
-                try {
-                    recognition.start();
-                } catch (error) {
-                    console.log("Recognition already started or error:", error);
-                }
-            }
+        // Check if speech synthesis is happening
+        if (speechSupported && synth && synth.speaking) {
+          return;
         }
         
-        // Mic button click handler with fallback for unsupported browsers
-        micButton.addEventListener('click', () => {
-            if (speechRecognitionSupported) {
-                if (micButton.classList.contains('active')) {
-                    if (recognition) recognition.stop();
-                    autoListeningMode = false;
-                } else {
-                    startListening();
-                    autoListeningMode = true;
-                }
-            } else {
-                featureNotice.textContent = "Speech recognition is not supported in this environment";
-                featureNotice.style.display = "flex";
-                
-                setTimeout(() => {
-                    featureNotice.style.display = "none";
-                }, 3000);
-            }
-        });
+        recognition.start();
+      } catch (error) {
+        console.log("Recognition error:", error);
+        // Reset states
+        micButton.classList.remove('active');
+        listeningIndicator.classList.remove('active');
+        avatarContainer.classList.remove('listening');
+      }
+    } else {
+      console.log("Recognition not supported");
+    }
+  }
+  
+  // Update mic button based on feature availability
+  if (!recognitionSupported) {
+    micButton.style.display = "none";
+  } else {
+    // Mic button click handler
+    micButton.addEventListener('click', () => {
+      if (recognitionSupported && recognition) {
+        if (micButton.classList.contains('active')) {
+          try {
+            recognition.stop();
+          } catch (e) {
+            console.log("Error stopping recognition:", e);
+          }
+          autoListeningMode = false;
+        } else {
+          startListening();
+          autoListeningMode = true;
+        }
+      } else {
+        alert('Speech recognition is not supported in your browser');
+      }
+    });
+  }
+  
+  // Speak text function with error handling
+  function speakText(text) {
+    if (!speechSupported) {
+      // Fallback for non-speech environments - just animate the avatar
+      handleAvatarTalking(text);
+      return;
+    }
+    
+    try {
+      if (synth.speaking) {
+        synth.cancel();
+      }
+      
+      clearTimeout(listeningTimeout);
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Select a good voice
+      let selectedVoice = null;
+      
+      if (voices.length > 0) {
+        selectedVoice = voices.find(voice => 
+          voice.name.includes('Female') || 
+          voice.name.includes('Samantha') || 
+          voice.name.includes('Google')
+        );
+      }
+      
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+      
+      utterance.pitch = 1;
+      utterance.rate = 1;
+      utterance.volume = 1;
+      
+      utterance.onstart = function() {
+        // Add speaking effects
+        avatarContainer.classList.add('speaking');
+        avatar.src = talkingAvatarUrl;
+        volumeIndicator.classList.add('active');
+      };
+      
+      utterance.onend = function() {
+        // Change back to default avatar and remove effects
+        avatar.src = defaultAvatarUrl;
+        volumeIndicator.classList.remove('active');
+        avatarContainer.classList.remove('speaking');
         
-        // Speak text function with fallback
-        function speakText(text) {
-            if (!speechSynthesisSupported || !synth) {
-                // Just change the avatar temporarily if speech not supported
-                avatar.src = talkingAvatarUrl;
-                avatarContainer.classList.add('speaking');
-                
-                setTimeout(() => {
-                    avatar.src = defaultAvatarUrl;
-                    avatarContainer.classList.remove('speaking');
-                }, 3000);
-                
-                return;
-            }
-            
-            if (synth.speaking) {
-                synth.cancel();
-            }
-            
-            clearTimeout(listeningTimeout);
-            
-            const utterance = new SpeechSynthesisUtterance(text);
-            
-            // Select a good voice
-            let selectedVoice = voices.find(voice => 
-                voice.name.includes('Female') || 
-                voice.name.includes('Samantha') || 
-                voice.name.includes('Google')
-            );
-            
-            if (selectedVoice) {
-                utterance.voice = selectedVoice;
-            }
-            
-            utterance.pitch = 1;
-            utterance.rate = 1;
-            utterance.volume = 1;
-            
-            utterance.onstart = function() {
-                // Add speaking effects
-                avatarContainer.classList.add('speaking');
-                avatar.src = talkingAvatarUrl;
-                volumeIndicator.classList.add('active');
-            };
-            
-            utterance.onend = function() {
-                // Change back to default avatar and remove effects
-                avatar.src = defaultAvatarUrl;
-                volumeIndicator.classList.remove('active');
-                avatarContainer.classList.remove('speaking');
-                
-                // Restart auto-listening after speaking if in auto mode
-                if (autoListeningMode) {
-                    listeningTimeout = setTimeout(() => {
-                        startListening();
-                    }, 1500);
-                }
-            };
-            
-            try {
-                synth.speak(utterance);
-            } catch (error) {
-                console.error("Speech synthesis error:", error);
-                avatar.src = defaultAvatarUrl;
-                volumeIndicator.classList.remove('active');
-                avatarContainer.classList.remove('speaking');
-            }
+        // Restart auto-listening after speaking if in auto mode
+        if (autoListeningMode && recognitionSupported) {
+          listeningTimeout = setTimeout(() => {
+            startListening();
+          }, 1500);
+        }
+      };
+      
+      synth.speak(utterance);
+    } catch (e) {
+      console.log("Speech synthesis error:", e);
+      // Fallback animation if speech fails
+      handleAvatarTalking(text);
+    }
+  }
+  
+  // Fallback animation for WebView environments without speech synthesis
+  function handleAvatarTalking(text) {
+    // Animate avatar for approximately the time it would take to speak the text
+    const wordsCount = text.split(' ').length;
+    const speakingTime = Math.max(3000, wordsCount * 300); // Roughly 300ms per word
+    
+    // Show talking avatar
+    avatar.src = talkingAvatarUrl;
+    avatarContainer.classList.add('speaking');
+    volumeIndicator.classList.add('active');
+    
+    // Return to default after estimated speaking time
+    setTimeout(() => {
+      avatar.src = defaultAvatarUrl;
+      volumeIndicator.classList.remove('active');
+      avatarContainer.classList.remove('speaking');
+      
+      // Restart auto-listening after animation if in auto mode
+      if (autoListeningMode && recognitionSupported) {
+        listeningTimeout = setTimeout(() => {
+          startListening();
+        }, 1500);
+      }
+    }, speakingTime);
+  }
+
+  bottom.addEventListener("click", () => {
+    input.focus();
+  });
+
+  input.addEventListener("input", () => {
+    if (input.value.length > 0 && input.value !== "Listening...") {
+      sendbtn.style.color = "#11ba91";
+    } else {
+      sendbtn.style.color = "#dbdbdb";
+    }
+  });
+
+  input.addEventListener("keypress", (event) => {
+    if (event.key === "Enter") {
+      ChatGPT();
+    }
+  });
+
+  function getCurrentTime() {
+    const now = new Date();
+    return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  }
+
+  async function ChatGPT() {
+    if (
+      input.value !== "" &&
+      input.value !== null &&
+      input.value.length > 0 &&
+      input.value.trim() !== "" &&
+      input.value !== "Listening..."
+    ) {
+      sendbtn.style.color = "#dbdbdb";
+
+      // Auto-listening mode should pause during conversation
+      if (recognitionSupported && recognition && autoListeningMode) {
+        clearTimeout(listeningTimeout);
+        try {
+          recognition.stop();
+        } catch (e) {
+          console.log("Error stopping recognition:", e);
+        }
+      }
+
+      // Store user input and clear the input field
+      const userInput = input.value;
+      input.value = "";
+
+      // Add user message with time
+      let li = document.createElement("li");
+      li.className = "schat";
+      li.textContent = userInput;
+      
+      // Add time element
+      let timeSpan = document.createElement("div");
+      timeSpan.className = "msg-time";
+      timeSpan.textContent = getCurrentTime();
+      li.appendChild(timeSpan);
+      
+      ul.appendChild(li);
+      $(".msgs_cont").scrollTop($(".msgs_cont")[0].scrollHeight);
+
+      // Add typing animation
+      let typingAnimationDiv = document.createElement("div");
+      typingAnimationDiv.className = "typing-animation";
+      for (var i = 0; i < 3; i++) {
+        var dotSpan = document.createElement("span");
+        dotSpan.className = "dot";
+        typingAnimationDiv.appendChild(dotSpan);
+      }
+
+      let li2 = document.createElement("li");
+      li2.className = "rchat";
+      li2.appendChild(typingAnimationDiv);
+      
+      // Keep default avatar during typing animation
+      avatar.src = defaultAvatarUrl;
+
+      setTimeout(() => {
+        ul.appendChild(li2);
+        $(".msgs_cont").scrollTop($(".msgs_cont")[0].scrollHeight);
+      }, 500);
+
+      sendbtn.disabled = true;
+      input.disabled = true;
+
+      // API Integration with better error handling
+      const apiKey = "AIzaSyDhDhiKFkaYAp-o0lGL4e4uJSYIJSh6paY";
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+      const requestOptions = {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: userInput,
+                },
+              ],
+            },
+          ],
+        }),
+      };
+
+      try {
+        const response = await fetch(apiUrl, requestOptions);
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+
+        // Check if the response has the expected format
+        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
+          throw new Error("Unexpected API response format");
         }
 
-        bottom.addEventListener("click", () => {
-            input.focus();
-        });
+        // Extract the response text
+        let apiResponse = data.candidates[0].content.parts[0].text.trim();
 
-        input.addEventListener("input", () => {
-            if (input.value.length > 0 && input.value !== "Listening...") {
-                sendbtn.style.color = "#11ba91";
-            } else {
-                sendbtn.style.color = "#dbdbdb";
-            }
-        });
+        // Replace "Google" with "Dazzlone"
+        apiResponse = apiResponse.replace(/\bGoogle\b/g, "Dazzlone");
 
-        input.addEventListener("keypress", (event) => {
-            if (event.key === "Enter") {
-                ChatGPT();
-            }
-        });
-
-        function getCurrentTime() {
-            const now = new Date();
-            return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-        }
-
-        async function ChatGPT() {
-            if (
-                input.value !== "" &&
-                input.value !== null &&
-                input.value.length > 0 &&
-                input.value.trim() !== "" &&
-                input.value !== "Listening..."
-            ) {
-                sendbtn.style.color = "#dbdbdb";
-
-                // Auto-listening mode should pause during conversation
-                if (recognition && autoListeningMode) {
-                    clearTimeout(listeningTimeout);
-                    try {
-                        recognition.stop();
-                    } catch (e) {
-                        // Ignore if not listening
-                    }
-                }
-
-                // Store user input and clear the input field
-                const userInput = input.value;
-                input.value = "";
-
-                // Add user message with time
-                let li = document.createElement("li");
-                li.className = "schat";
-                li.textContent = userInput;
-                
-                // Add time element
-                let timeSpan = document.createElement("div");
-                timeSpan.className = "msg-time";
-                timeSpan.textContent = getCurrentTime();
-                li.appendChild(timeSpan);
-                
-                ul.appendChild(li);
-                $(".msgs_cont").scrollTop($(".msgs_cont")[0].scrollHeight);
-
-                // Add typing animation
-                let typingAnimationDiv = document.createElement("div");
-                typingAnimationDiv.className = "typing-animation";
-                for (var i = 0; i < 3; i++) {
-                    var dotSpan = document.createElement("span");
-                    dotSpan.className = "dot";
-                    typingAnimationDiv.appendChild(dotSpan);
-                }
-
-                let li2 = document.createElement("li");
-                li2.className = "rchat";
-                li2.appendChild(typingAnimationDiv);
-                
-                // Keep default avatar during typing animation
-                
-            avatar.src = defaultAvatarUrl;
-
-            setTimeout(() => {
-              ul.appendChild(li2);
-              $(".msgs_cont").scrollTop($(".msgs_cont")[0].scrollHeight);
-            }, 500);
-
-            sendbtn.disabled = true;
-            input.disabled = true;
-
-            // Gemini API Integration
-            const apiKey = "AIzaSyDhDhiKFkaYAp-o0lGL4e4uJSYIJSh6paY";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-            const requestOptions = {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                contents: [
-                  {
-                    parts: [
-                      {
-                        text: userInput,
-                      },
-                    ],
-                  },
-                ],
-              }),
-            };
-
-            try {
-              const response = await fetch(apiUrl, requestOptions);
-              const data = await response.json();
-
-              // Extract the response text
-              let apiResponse = data.candidates[0].content.parts[0].text.trim();
-
-              // Replace "Google" with "Dazzlone"
-              apiResponse = apiResponse.replace(/\bGoogle\b/g, "Dazzlone");
-
-              // Clear typing animation
-              li2.innerHTML = "";
-              
-              // Change to talking avatar when response is ready and speaking begins
-              avatar.src = talkingAvatarUrl;
-              volumeIndicator.classList.add('active');
-              
-              // Start speech synthesis
-              speakText(apiResponse);
-              
-              // Display the response with typing effect
-              let responseText = "";
-              let i = 0;
+        // Clear typing animation
+        li2.innerHTML = "";
+        
+        // Start speech synthesis or avatar animation
+        speakText(apiResponse);
+        
+        // Display the response with typing effect
+        let responseText = "";
+        let i = 0;
+     
               const intervalId = setInterval(() => {
                 if (i < apiResponse.length) {
                   responseText += apiResponse[i];
